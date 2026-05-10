@@ -1,0 +1,81 @@
+// ============================================================
+//  IS A SQUARE BEING ATTACKED?
+//  Checks if any enemy piece can reach square (r,c)
+// ============================================================
+bool isAttacked(Board& b, int r, int c, bool byWhite) {
+    for (int i = 0; i < 8; i++) {
+        for (int j = 0; j < 8; j++) {
+            char attack = b.grid[i][j];
+            if (attack == '.') continue;
+            // skip pieces that are not the attacking side
+            //bywhite is the function that shows who is the attacker side
+            //bywhite -> true (white is attacker)
+            if (byWhite && !isWhite(attack)) continue;
+            if (!byWhite && !isBlack(attack)) continue;
+            char low = myToLower(attack);
+            // pawn only attacks diagonally (NOT straight forward)
+            if (low == 'p') {
+                int dir = byWhite ? -1 : 1;
+                if (myAbs(c - j) == 1 && r == i + dir) return true;
+            }
+            // use piece objects to check attack (polymorphism)
+            else if (low == 'r') { Rook   tmp(byWhite); if (tmp.isValidMove(b, i, j, r, c)) return true; }
+            else if (low == 'n') { Knight tmp(byWhite); if (tmp.isValidMove(b, i, j, r, c)) return true; }
+            else if (low == 'b') { Bishop tmp(byWhite); if (tmp.isValidMove(b, i, j, r, c)) return true; }
+            else if (low == 'q') { Queen  tmp(byWhite); if (tmp.isValidMove(b, i, j, r, c)) return true; }
+            else if (low == 'k' && myAbs(r - i) <= 1 && myAbs(c - j) <= 1) return true;
+        }
+    }
+    return false;
+}
+
+//  CHECK, CHECKMATE, STALEMATE
+// is the given side's king currently under attack?
+bool isInCheck(Board& b, bool white) {
+    int kr, kc;
+    findKing(b, white, kr, kc);
+    if (kr == -1) return false;           // king not found (should not happen)
+    return isAttacked(b, kr, kc, !white); // is king's square attacked by enemy?
+}
+// tries a move on a COPY of the board, checks if king is still safe
+// we do this before applying any real move
+bool moveSafe(Board& b, int sr, int sc, int dr, int dc, bool white) {
+    Board copy = b; // copy the entire board (works because Board only has arrays)
+    char low = myToLower(copy.grid[sr][sc]);
+    // en passant and castling handling removed
+    // make the move on the copy
+    copy.grid[dr][dc] = copy.grid[sr][sc];
+    copy.grid[sr][sc] = '.';
+    // the move is safe only if king is NOT in check after it
+    return !isInCheck(copy, white);
+}
+// checks if the given side has any legal move available
+bool hasAnyMove(Board& b, bool white) {
+    for (int sr = 0; sr < 8; sr++) {
+        for (int sc = 0; sc < 8; sc++) {
+            char p = b.grid[sr][sc];
+            if (p == '.' || isWhite(p) != white) continue; // skip empty or wrong color
+            // try every possible destination square
+            for (int dr = 0; dr < 8; dr++) {
+                for (int dc = 0; dc < 8; dc++) {
+                    if (sr == dr && sc == dc) continue; // can't stay in same place
+                    char low = myToLower(p);
+                    bool valid = false;
+                    // create piece object and call isValidMove (polymorphism)
+                    if (low == 'p') { Pawn   tmp(white); valid = tmp.isValidMove(b, sr, sc, dr, dc); }
+                    if (low == 'r') { Rook   tmp(white); valid = tmp.isValidMove(b, sr, sc, dr, dc); }
+                    if (low == 'n') { Knight tmp(white); valid = tmp.isValidMove(b, sr, sc, dr, dc); }
+                    if (low == 'b') { Bishop tmp(white); valid = tmp.isValidMove(b, sr, sc, dr, dc); }
+                    if (low == 'q') { Queen  tmp(white); valid = tmp.isValidMove(b, sr, sc, dr, dc); }
+                    if (low == 'k') { King   tmp(white); valid = tmp.isValidMove(b, sr, sc, dr, dc); }
+                    // also: can't capture your own piece
+                    if (b.grid[dr][dc] != '.' && isWhite(b.grid[dr][dc]) == white)
+                        valid = false;
+                    if (valid && moveSafe(b, sr, sc, dr, dc, white))
+                        return true; // found at least one legal move
+                }
+            }
+        }
+    }
+    return false; // no legal move found
+}
